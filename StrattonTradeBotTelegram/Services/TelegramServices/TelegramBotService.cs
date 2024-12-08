@@ -1,7 +1,6 @@
 ﻿using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.ReplyMarkups;
 using Telegram.Bot.Types;
 using StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService;
 
@@ -41,15 +40,11 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
 
                 if (messageText.StartsWith("/"))
                 {
-                    // BinanceCoinService'den fiyat bilgisini al
-                    string symbol = messageText.Substring(1); // /BTCUSDT kısmındaki '/' karakterini çıkar
+                    string symbol = messageText.Substring(1); 
                     var price = await _binanceCoinService.BinanceCoinAmount(symbol);
-                    // Fiyat bilgisini kullanıcıya gönder
                     await botClient.SendTextMessageAsync(update.Message.Chat.Id, $"{symbol} fiyatı: {price}");
                 }
-
             }
-          
         }
 
         private Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)

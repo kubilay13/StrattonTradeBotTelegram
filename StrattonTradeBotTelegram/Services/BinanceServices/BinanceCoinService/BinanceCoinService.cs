@@ -19,8 +19,7 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
             {
                 return $"{result.Data.LastPrice} $";  
             }
-            
-
+                return $"{Symbol} Fiyat bilgisi alındı!"; 
         }
         
     }
