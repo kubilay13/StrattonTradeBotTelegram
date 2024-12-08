@@ -1,10 +1,10 @@
 using Telegram.Bot;
 using StrattonTradeBotTelegram.Services.TelegramServices;
-using StrattonTradeBotTelegram.Services.BinanceServices;
 using StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService;
 using Binance.Net.Clients;
 
 var builder = WebApplication.CreateBuilder(args);
+
 
 // Telegram Bot Token'i yapýlandýrmadan alýn
 var telegramBotToken = builder.Configuration["TelegramBot:Token"];

@@ -53,6 +53,5 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
             return Task.CompletedTask;
         }
     }
-
 }
 
