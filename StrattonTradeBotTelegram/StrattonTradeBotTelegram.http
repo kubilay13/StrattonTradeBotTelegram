@@ -1,0 +1,6 @@
+@StrattonTradeBotTelegram_HostAddress = http://localhost:5192
+
+GET {{StrattonTradeBotTelegram_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
