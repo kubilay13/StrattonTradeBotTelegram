@@ -40,12 +40,24 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
             if (update.Message is { } message)
             {
                 var messageText = update.Message.Text;
-
+                if (messageText.StartsWith("/Komutlar"))
+                {
+                    await botClient.SendTextMessageAsync(message.Chat.Id, "/SYMBOL");
+                }
                 if (messageText.StartsWith("/"))
                 {
-                    string symbol = messageText.Substring(1); 
-                    var price = await _binanceCoinService.BinanceCoinAmount(symbol);
-                    await botClient.SendTextMessageAsync(update.Message.Chat.Id, $"{symbol} fiyatı: {price}");
+                    string symbol = messageText.Substring(1).ToUpper(); // '/' işaretini çıkar ve büyük harfe çevir
+                    // Eğer USDT ile bitiyorsa fiyat bilgisi al
+                    if (symbol.EndsWith("USDT"))
+                    {
+                        var price = await _binanceCoinService.BinanceCoinAmount(symbol);
+                        await botClient.SendTextMessageAsync(message.Chat.Id, $"{symbol} fiyatı: {price}");
+                    }
+                    else
+                    {
+                        // USDT ile bitmiyorsa uyarı gönder
+                        await botClient.SendTextMessageAsync(message.Chat.Id, "Fiyat sembol formatı! Örnek: /BTCUSDT veya /ETHUSDT");
+                    }
                 }
             }
         }

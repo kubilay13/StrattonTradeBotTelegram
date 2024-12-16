@@ -1,7 +1,6 @@
 using Telegram.Bot;
 using StrattonTradeBotTelegram.Services.TelegramServices;
 using StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService;
-using Binance.Net.Clients;
 
 var builder = WebApplication.CreateBuilder(args);
 
