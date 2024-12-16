@@ -82,17 +82,58 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                     }
                 }
 
-
-                    if (messageText.StartsWith("/"))
+                if (messageText.StartsWith("/"))
                 {
-                    string symbol = messageText.Substring(1).ToUpper(); // '/' işaretini çıkar ve büyük harfe çevir
-                    // Eğer USDT ile bitiyorsa fiyat bilgisi al
-                    if (symbol.EndsWith("USDT"))
+                   string symbol = messageText.Substring(1).ToUpper(); // '/' işaretini çıkar ve büyük harfe çevir
+                   // Eğer USDT ile bitiyorsa fiyat bilgisi al
+                   if (symbol.EndsWith("USDT"))
+                   {
+                       var price = await _binanceCoinService.BinanceCoinAmount(symbol);
+                       await botClient.SendTextMessageAsync(message.Chat.Id, $"{symbol} fiyatı: {price}");
+                   }
+                }
+                //PİYASA FİYATINDAN İŞLEM AÇMA
+                if (messageText.StartsWith("/"))
+                {
+                    // Komutun parçalarını ayrıştır
+                    var parts = messageText.Substring(1).Split(' '); // '/' işaretini çıkar ve boşluklardan ayır
+                    if (parts.Length == 4)
                     {
-                        var price = await _binanceCoinService.BinanceCoinAmount(symbol);
-                        await botClient.SendTextMessageAsync(message.Chat.Id, $"{symbol} fiyatı: {price}");
+                        string symbol = parts[0].ToUpper();  // Sembol (ör. BTCUSDT)
+                        string action = parts[1].ToUpper();  // İşlem türü (LONG/SHORT)
+                        int leverage;
+                        decimal amount;
+
+                        // Geçerli kaldıracı ve miktarı doğrula
+                        if (int.TryParse(parts[2], out leverage) && decimal.TryParse(parts[3], out amount))
+                        {
+                            if (symbol.EndsWith("USDT") && (action == "LONG" || action == "SHORT"))
+                            {
+                                // Binance API'si üzerinden işlem aç
+                                var result = await _binanceCoinService.OpenPosition(symbol, action, leverage, amount);
+
+                                // Kullanıcıya işlem sonucu mesajı gönder
+                                await botClient.SendTextMessageAsync(message.Chat.Id, result);
+                                var balance = await _binanceCoinService.GetUserFuturesBalanceAsync();
+                                await botClient.SendTextMessageAsync(message.Chat.Id, $"Balance: {balance-amount} $");
+
+                            }
+                            else
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat.Id, "Hatalı komut. Doğru format: /symbol LONG/SHORT LEVERAGE AMOUNT");
+                            }
+                        }
+                        else
+                        {
+                            await botClient.SendTextMessageAsync(message.Chat.Id, "Hatalı kaldırac veya miktar. Örnek: /BTCUSDT LONG 25 100");
+                        }
+                    }
+                    else
+                    {
+                        await botClient.SendTextMessageAsync(message.Chat.Id, "Hatalı komut formatı. Örnek: /BTCUSDT LONG 25 100");
                     }
                 }
+
             }
         }
         private Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
