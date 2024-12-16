@@ -7,25 +7,23 @@ var builder = WebApplication.CreateBuilder(args);
 
 
 // Telegram Bot Token'i yapýlandýrmadan alýn
-var telegramBotToken = builder.Configuration["TelegramBot:Token"];
-if (string.IsNullOrEmpty(telegramBotToken))
-{
-    throw new InvalidOperationException("Telegram bot token is not configured. Please check appsettings.json.");
-}
 
+var telegramBotToken = builder.Configuration["TelegramBot:Token"];
+var binanceApiKey = builder.Configuration["Binance:ApiKey"];
+var binanceApiSecret = builder.Configuration["Binance:ApiSecret"];
+
+// Testnet veya Live seçeneðini belirleyin
+bool isTestnet = builder.Configuration.GetValue<bool>("Binance:IsTestnet", true);
+
+var binanceService = new BinanceCoinService(binanceApiKey, binanceApiSecret, isTestnet);
 // Telegram Bot istemcisini baðýmlýlýk enjeksiyonuna ekleyin
 builder.Services.AddSingleton<ITelegramBotClient>(new TelegramBotClient(telegramBotToken));
-
-// Telegram ve Binance servislerini kaydedin
-builder.Services.AddSingleton<TelegramBotService>();
-builder.Services.AddSingleton<BinanceCoinService>();
-builder.Services.AddSingleton<BinanceRestClient>();
 
 // Diðer servisleri ekle
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
+builder.Services.AddSingleton(new TelegramBotService(telegramBotToken, binanceApiKey, binanceApiSecret, isTestnet, binanceService));
 var app = builder.Build();
 
 // Telegram bot servisini baþlat

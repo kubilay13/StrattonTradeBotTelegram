@@ -11,10 +11,13 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
         private readonly ITelegramBotClient _botService;
         private readonly BinanceCoinService _binanceCoinService;
 
-        public TelegramBotService(ITelegramBotClient telegramBotClient,IConfiguration configuration,BinanceCoinService binanceCoinService)
+        public TelegramBotService(string token, string binanceApiKey, string binanceApiSecret, bool isTestnet,BinanceCoinService binanceCoinService)
         {
+            var botOptions = new TelegramBotClientOptions(token);
+            _botService = new TelegramBotClient(botOptions);
+            _binanceCoinService = new BinanceCoinService(binanceApiKey, binanceApiSecret, isTestnet);
             _binanceCoinService = binanceCoinService;
-            _botService = telegramBotClient;
+
         }
         public void StartReceiving()
         {
