@@ -36,6 +36,26 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
             }
                 return $"{Symbol} Fiyat bilgisi alındı!"; 
         }
-        
+
+        public async Task<string> BinancePopularCoinAmountTimer()
+        {
+            var symbols = new[] { "BTCUSDT", "ETHUSDT", "BNBUSDT", "TRXUSDT" };
+            var pricemessage = new List<string>();
+            foreach(var i in symbols)
+            {
+                var result= await _binanceRestClient.SpotApi.ExchangeData.GetTickerAsync($"{i}");
+                if(result.Success)
+                {
+
+                    pricemessage.Add($"{i} fiyatı {result.Data.LastPrice} $");
+                    
+                }
+                else
+                {
+                    pricemessage.Add("Fiyat Bilgileri Alınamadı.");
+                }
+            }
+            return string.Join("\n", pricemessage);
+        }
     }
 }

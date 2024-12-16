@@ -4,9 +4,7 @@ using StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
 // Telegram Bot Token'i yapýlandýrmadan alýn
-
 var telegramBotToken = builder.Configuration["TelegramBot:Token"];
 var binanceApiKey = builder.Configuration["Binance:ApiKey"];
 var binanceApiSecret = builder.Configuration["Binance:ApiSecret"];
@@ -14,15 +12,37 @@ var binanceApiSecret = builder.Configuration["Binance:ApiSecret"];
 // Testnet veya Live seçeneðini belirleyin
 bool isTestnet = builder.Configuration.GetValue<bool>("Binance:IsTestnet", true);
 
-var binanceService = new BinanceCoinService(binanceApiKey, binanceApiSecret, isTestnet);
+// BinanceCoinService'i baðýmlýlýk enjeksiyonuna ekliyoruz
+builder.Services.AddSingleton<BinanceCoinService>(serviceProvider =>
+{
+    return new BinanceCoinService(binanceApiKey, binanceApiSecret, isTestnet);
+});
+
 // Telegram Bot istemcisini baðýmlýlýk enjeksiyonuna ekleyin
 builder.Services.AddSingleton<ITelegramBotClient>(new TelegramBotClient(telegramBotToken));
+
+// PriceReminderService'i baðýmlýlýklarýný çözerek ekliyoruz
+builder.Services.AddSingleton<PriceReminderService>(serviceProvider =>
+{
+    var telegramBotClient = serviceProvider.GetRequiredService<ITelegramBotClient>();
+    var binanceCoinService = serviceProvider.GetRequiredService<BinanceCoinService>();
+    var chatId = builder.Configuration.GetValue<long>("TelegramBot:ChatId");  // Örneðin, konfigürasyondan alabilirsiniz
+    return new PriceReminderService(telegramBotClient, binanceCoinService, chatId);
+});
+
+// TelegramBotService'i ekliyoruz
+builder.Services.AddSingleton<TelegramBotService>(serviceProvider =>
+{
+    var priceReminderService = serviceProvider.GetRequiredService<PriceReminderService>();
+    var binanceCoinService = serviceProvider.GetRequiredService<BinanceCoinService>();
+    return new TelegramBotService(telegramBotToken, binanceApiKey, binanceApiSecret, isTestnet, binanceCoinService, priceReminderService);
+});
 
 // Diðer servisleri ekle
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddSingleton(new TelegramBotService(telegramBotToken, binanceApiKey, binanceApiSecret, isTestnet, binanceService));
+
 var app = builder.Build();
 
 // Telegram bot servisini baþlat
