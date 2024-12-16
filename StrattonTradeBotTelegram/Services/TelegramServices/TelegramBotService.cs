@@ -45,7 +45,11 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                 {
                     await botClient.SendTextMessageAsync(message.Chat.Id, "/SYMBOL");
                 }
-
+                if (messageText.StartsWith("/Balance"))
+                {
+                    var balance= await _binanceCoinService.GetUserFuturesBalanceAsync();
+                    await botClient.SendTextMessageAsync(message.Chat.Id, $"Balance: {balance} $");
+                }
                 if (messageText.StartsWith("/FiyatTakipAç"))
                 {
                     // Fiyat hatırlatıcı servisi başlatılmadıysa başlat
@@ -55,7 +59,6 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                         _priceReminderService.StartPriceReminder(message.Chat.Id);  // Chat ID'yi buraya geçir
                         _isPriceReminderStarted = true;  // Zamanlayıcı başlatıldı
 
-                        // Kullanıcıya yanıt gönder
                         await botClient.SendTextMessageAsync(message.Chat.Id, "Fiyat hatırlatıcı başlatıldı!");
                     }
                     else
@@ -92,7 +95,6 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                 }
             }
         }
-
         private Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
         {
             Console.WriteLine($"Hata oluştu: {exception.Message}");

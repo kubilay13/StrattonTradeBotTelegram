@@ -57,5 +57,28 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
             }
             return string.Join("\n", pricemessage);
         }
+
+        public async Task<decimal> GetUserFuturesBalanceAsync()
+        {
+            try
+            {
+                var result = await _binanceRestClient.UsdFuturesApi.Account.GetAccountInfoV2Async();
+                if (result.Success)
+                {
+                    var balance = result.Data.TotalWalletBalance;
+                    return balance;
+                }
+                else
+                {
+                    throw new Exception("Vadeli işlemler bakiyesi alınamadı.❌");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Hata: {ex.Message} ❌");
+                throw;
+            }
+        }
+
     }
 }
