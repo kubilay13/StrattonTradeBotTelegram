@@ -81,23 +81,57 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                         await botClient.SendTextMessageAsync(message.Chat.Id, "Fiyat hatırlatıcı durduruldu.");
                     }
                 }
+
                 if (messageText.StartsWith("/"))
                 {
-                        string symbol = messageText.Substring(1).ToUpper(); // '/' işaretini çıkar ve büyük harfe çevir
+                    // Coin sembolünü al ("/BTCUSDT" -> "BTCUSDT")
+                    string symbol = messageText.Substring(1).ToUpper();
 
-                        // Eğer USDT ile bitiyorsa fiyat bilgisi al
-                        if (symbol.EndsWith("USDT"))
+                    // Eğer coin sembolü "USDT" ile bitiyorsa fiyat bilgisini al
+                    if (symbol.EndsWith("USDT"))
+                    {
+                        try
                         {
-                            // Fiyat bilgisini al
-                            var price = await _binanceCoinService.BinanceCoinAmount(symbol);
-                            await botClient.SendTextMessageAsync(message.Chat.Id, $"{symbol} fiyatı: {price}");
+                            // Binance API üzerinden fiyat bilgisini al
+                            string price = await _binanceCoinService.BinanceCoinAmount(symbol);
 
-                            // Destek ve direnç seviyelerini al
-                            var (supportLevel, resistanceLevel) = await _binanceCoinService.GetSupportResistance(symbol);
+                            // Fiyatı temizleyin: '$' ve diğer metinlerden kurtulun
+                            string cleanPrice = new string(price.Where(c => char.IsDigit(c) || c == '.').ToArray());
+
+                            // Eğer temizlenmiş fiyat bir decimal'a dönüşebiliyorsa, dönüştürme işlemi yapılır
+                            if (decimal.TryParse(cleanPrice, out decimal entryPrice))
+                            {
+                                // Başarıyla dönüşüm yapıldı, entryPrice kullanılabilir
+                                Console.WriteLine($"Giriş fiyatı: {entryPrice}");
+                            }
+                            else
+                            {
+                                // Fiyat geçerli bir decimal değilse, hata mesajı
+                                Console.WriteLine("Fiyat geçerli bir decimal değeri değil.");
+                            }
+
+                            // TP ve SL seviyelerini belirle
+                            decimal tpPrice = entryPrice * 1.02m;  // %2 TP
+                            decimal slPrice = entryPrice * 0.99m;  // %1 SL
+
+                            // Kullanıcıya giriş fiyatı, TP ve SL seviyelerini gönder
                             await botClient.SendTextMessageAsync(message.Chat.Id,
-                                $"{symbol} için Destek Seviyesi: {supportLevel}\n" +
-                                $"{symbol} için Direnç Seviyesi: {resistanceLevel}");
+                                $"{symbol} için işlem bilgileri:\n" +
+                                $"Giriş Fiyatı: {entryPrice} USDT\n" +
+                                $"Take Profit (TP): {tpPrice} USDT\n" +
+                                $"Stop Loss (SL): {slPrice} USDT");
                         }
+                        catch (Exception ex)
+                        {
+                            // Eğer hata olursa hata mesajı gönder
+                            await botClient.SendTextMessageAsync(message.Chat.Id, "Fiyat alınırken bir hata oluştu. Lütfen tekrar deneyin.");
+                        }
+                    }
+                    else
+                    {
+                        // USDT ile bitmeyen coin sembolü için uyarı
+                        await botClient.SendTextMessageAsync(message.Chat.Id, "Lütfen geçerli bir USDT sembolü girin (örneğin, BTCUSDT).");
+                    }
                 }
                 //PİYASA FİYATINDAN İŞLEM AÇMA
                 if (messageText.StartsWith("/"))
