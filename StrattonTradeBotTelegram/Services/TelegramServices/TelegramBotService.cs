@@ -81,16 +81,23 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                         await botClient.SendTextMessageAsync(message.Chat.Id, "Fiyat hatırlatıcı durduruldu.");
                     }
                 }
-
                 if (messageText.StartsWith("/"))
                 {
-                   string symbol = messageText.Substring(1).ToUpper(); // '/' işaretini çıkar ve büyük harfe çevir
-                   // Eğer USDT ile bitiyorsa fiyat bilgisi al
-                   if (symbol.EndsWith("USDT"))
-                   {
-                       var price = await _binanceCoinService.BinanceCoinAmount(symbol);
-                       await botClient.SendTextMessageAsync(message.Chat.Id, $"{symbol} fiyatı: {price}");
-                   }
+                        string symbol = messageText.Substring(1).ToUpper(); // '/' işaretini çıkar ve büyük harfe çevir
+
+                        // Eğer USDT ile bitiyorsa fiyat bilgisi al
+                        if (symbol.EndsWith("USDT"))
+                        {
+                            // Fiyat bilgisini al
+                            var price = await _binanceCoinService.BinanceCoinAmount(symbol);
+                            await botClient.SendTextMessageAsync(message.Chat.Id, $"{symbol} fiyatı: {price}");
+
+                            // Destek ve direnç seviyelerini al
+                            var (supportLevel, resistanceLevel) = await _binanceCoinService.GetSupportResistance(symbol);
+                            await botClient.SendTextMessageAsync(message.Chat.Id,
+                                $"{symbol} için Destek Seviyesi: {supportLevel}\n" +
+                                $"{symbol} için Direnç Seviyesi: {resistanceLevel}");
+                        }
                 }
                 //PİYASA FİYATINDAN İŞLEM AÇMA
                 if (messageText.StartsWith("/"))

@@ -14,6 +14,7 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
         private readonly IBinanceRestClientUsdFuturesApiAccount _accountApiClient;
         private readonly IBinanceRestClientUsdFuturesApiTrading _tradingApiClient;
 
+
         public BinanceCoinService(string apiKey, string apiSecret, bool isTestnet)
         {
             var binanceOptions = new BinanceRestOptions
@@ -157,6 +158,17 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
             {
                 return $"Bir hata oluştu: {ex.Message}";
             }
+        }
+        public async Task<(decimal support, decimal resistance)> GetSupportResistance(string symbol)
+        {
+            var klines = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour, limit: 50);
+            var lowPrices = klines.Data.Select(k => k.LowPrice).ToList();
+            var highPrices = klines.Data.Select(k => k.HighPrice).ToList();
+
+            decimal supportLevel = lowPrices.Min();
+            decimal resistanceLevel = highPrices.Max();
+
+            return (supportLevel, resistanceLevel);
         }
 
 
