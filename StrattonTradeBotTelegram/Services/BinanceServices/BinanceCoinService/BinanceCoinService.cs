@@ -1,9 +1,11 @@
 ﻿using Binance.Net;
 using Binance.Net.Clients;
 using Binance.Net.Enums;
+using Binance.Net.Interfaces;
 using Binance.Net.Interfaces.Clients.UsdFuturesApi;
 using Binance.Net.Objects.Options;
 using CryptoExchange.Net.Authentication;
+using CryptoExchange.Net.CommonObjects;
 
 namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
 {
@@ -88,95 +90,104 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
                 throw;
             }
         }
-        public async Task<string> OpenPosition(string symbol, string action, int leverage, decimal margin)
+        // Kline verisi dönüşümü için yardımcı metod
+        public List<decimal> GetClosesFromKlines(IEnumerable<IBinanceKline> klines)
         {
-            try
-            {
-                // 1. Marj modunu izole olarak ayarla
-                var marginTypeResult = await _usdFuturesApiClient.Account.ChangeMarginTypeAsync(symbol, FuturesMarginType.Isolated);
-                if (!marginTypeResult.Success && marginTypeResult.Error?.Message != "No need to change margin type.")
-                {
-                    // Eğer hata "Değişikliğe gerek yok" dışında bir şeyse, hata döndür
-                    return $"Marj modu ayarlanamadı: {marginTypeResult.Error?.Message}";
-                }
-
-                // 2. Kaldıraç ayarla
-                var leverageResult = await _usdFuturesApiClient.Account.ChangeInitialLeverageAsync(symbol, leverage);
-                if (!leverageResult.Success)
-                {
-                    return $"Kaldıraç ayarlanamadı: {leverageResult.Error?.Message}";
-                }
-
-                // 3. Sembol detaylarını al
-                var symbolDetailsResult = await _usdFuturesApiClient.ExchangeData.GetExchangeInfoAsync();
-                if (!symbolDetailsResult.Success)
-                {
-                    return $"Sembol bilgisi alınamadı: {symbolDetailsResult.Error?.Message}";
-                }
-
-                var symbolDetails = symbolDetailsResult.Data.Symbols.FirstOrDefault(s => s.Name == symbol);
-                if (symbolDetails == null)
-                {
-                    return $"Sembol bulunamadı: {symbol}";
-                }
-
-                int precision = symbolDetails.QuantityPrecision; // Miktar hassasiyeti
-
-                // 4. Fiyat bilgisi al
-                var priceResult = await _usdFuturesApiClient.ExchangeData.GetPriceAsync(symbol);
-                if (!priceResult.Success)
-                {
-                    return $"Fiyat bilgisi alınamadı: {priceResult.Error?.Message}";
-                }
-
-                decimal price = priceResult.Data.Price;
-
-                // 5. Pozisyon boyutunu hesapla
-                decimal positionSize = Math.Round(margin * leverage / price, precision);
-
-                // 6. İşlem türünü belirle
-                var side = action == "LONG" ? OrderSide.Buy : OrderSide.Sell;
-
-                // 7. Piyasa emri gönder
-                var orderResult = await _usdFuturesApiClient.Trading.PlaceOrderAsync(
-                    symbol: symbol,
-                    side: side,
-                    type: FuturesOrderType.Market,
-                    quantity: positionSize
-                );
-
-                if (orderResult.Success)
-                {
-                    return $"{action} pozisyon başarıyla açıldı: {symbol}, Kaldıraç: {leverage}X, Miktar: {margin}";
-                }
-                else
-                {
-                    return $"Pozisyon açılırken bir hata oluştu: {orderResult.Error?.Message}";
-                }
-            }
-            catch (Exception ex)
-            {
-                return $"Bir hata oluştu: {ex.Message}";
-            }
+            return klines.Select(kline => kline.ClosePrice).ToList();
         }
-        public async Task<(decimal support, decimal resistance)> GetSupportResistance(string symbol)
+
+        public async Task<string> GetTradeSuggestion(string symbol)
         {
-            var klines = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour, limit: 50);
-            var lowPrices = klines.Data.Select(k => k.LowPrice).ToList();
-            var highPrices = klines.Data.Select(k => k.HighPrice).ToList();
+            // Kline verisi alınması
+            var klineResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.FiveMinutes, limit: 50);
+            if (!klineResult.Success)
+                return $"Kline verileri alınamadı: {klineResult.Error?.Message}";
 
-            decimal supportLevel = lowPrices.Min();
-            decimal resistanceLevel = highPrices.Max();
+            var closes = klineResult.Data.Select(k => k.ClosePrice).ToList();
+            var highPrices = klineResult.Data.Select(k => k.HighPrice).ToList();
+            var lowPrices = klineResult.Data.Select(k => k.LowPrice).ToList();
 
-            return (supportLevel, resistanceLevel);
+            // Teknik göstergeler hesaplaması
+            var (macd, signal) = CalculateMACD(closes);
+            var rsi = CalculateRSI(closes, 14);
+            var sma50 = CalculateSMA(closes, 50).Last();
+            var sma200 = CalculateSMA(closes, 200).Last();
+            var ema50 = CalculateEMA(closes, 50).Last();
+            var ema200 = CalculateEMA(closes, 200).Last();
+            var bollingerBands = CalculateBollingerBands(closes);
+            var atr = CalculateATR(klineResult.Data.ToList(), 14);
+
+            // Mevcut fiyatı al
+            var priceResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetPriceAsync(symbol);
+            if (!priceResult.Success)
+                return $"Fiyat bilgisi alınamadı: {priceResult.Error?.Message}";
+
+            decimal currentPrice = priceResult.Data.Price;
+
+            // Risk-Reward hesaplaması
+            decimal tpPrice = currentPrice * 1.03m; // %3 Take Profit
+            decimal slPrice = currentPrice - atr * 1.5m; // ATR'ye dayalı Stop Loss
+            decimal riskRewardRatio = (tpPrice - currentPrice) / (currentPrice - slPrice); // Risk/Ödül Oranı hesaplama
+
+            // Ticaret önerisi başlatma
+            string tradeSuggestion = $"Giriş Fiyatı: {currentPrice}\n" +
+                                     $"Take Profit (TP): {tpPrice}\n" +
+                                     $"Stop Loss (SL): {slPrice}\n" +
+                                     $"Risk/Ödül Oranı: {riskRewardRatio:F2}\n";
+
+            // **LONG** Pozisyonu (Alış)
+            if (macd > signal && rsi < 30 && currentPrice < bollingerBands.Item1)
+            {
+                tradeSuggestion += "**LONG** pozisyon açılabilir.";
+            }
+            // **SHORT** Pozisyonu (Satış)
+            else if (macd < signal && rsi > 70 && currentPrice > bollingerBands.Item2)
+            {
+                tradeSuggestion += "**SHORT** pozisyon açılabilir.";
+            }
+            else
+            {
+                tradeSuggestion += "**BEKLE** pozisyonu.";
+            }
+
+            return tradeSuggestion;
         }
+
+
+
+        // Bollinger Bands hesaplama
+        public (decimal, decimal) CalculateBollingerBands(List<decimal> closes)
+        {
+            var sma = CalculateSMA(closes, 20);
+            var stdDev = Math.Sqrt(closes.Select(c => Math.Pow((double)c - (double)sma.Last(), 2)).Average());
+            decimal upperBand = sma.Last() + (decimal)(2 * stdDev);
+            decimal lowerBand = sma.Last() - (decimal)(2 * stdDev);
+            return (lowerBand, upperBand);
+        }
+
+        // ATR hesaplama
+        public decimal CalculateATR(List<IBinanceKline> klines, int period)
+        {
+            var trList = new List<decimal>();
+            for (int i = 1; i < klines.Count; i++)
+            {
+                decimal tr = Math.Max(klines[i].HighPrice - klines[i].LowPrice,
+                                       Math.Max(Math.Abs(klines[i].HighPrice - klines[i - 1].ClosePrice),
+                                                Math.Abs(klines[i].LowPrice - klines[i - 1].ClosePrice)));
+                trList.Add(tr);
+            }
+            return trList.Take(period).Average();
+        }
+
+
+
+        // RSI hesaplama
         public decimal CalculateRSI(List<decimal> closes, int period)
         {
             decimal gain = 0, loss = 0;
-
-            for (int i = 1; i < period; i++)
+            for (int i = 1; i <= period; i++)
             {
-                var change = closes[i] - closes[i - 1];
+                decimal change = closes[i] - closes[i - 1];
                 if (change > 0)
                     gain += change;
                 else
@@ -188,86 +199,48 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
 
             decimal rs = avgGain / avgLoss;
             decimal rsi = 100 - (100 / (1 + rs));
-
             return rsi;
         }
-        public (decimal macd, decimal signal) CalculateMACD(List<decimal> closes, int shortPeriod = 12, int longPeriod = 26, int signalPeriod = 9)
-        {
-            var shortEma = CalculateEMA(closes, shortPeriod);
-            var longEma = CalculateEMA(closes, longPeriod);
 
-            decimal macd = shortEma.Last() - longEma.Last();
-            var signal = CalculateEMA(closes.TakeLast(signalPeriod).ToList(), signalPeriod).Last();
+        // MACD hesaplama
+        public (decimal macd, decimal signal) CalculateMACD(List<decimal> closes)
+        {
+            var ema12 = CalculateEMA(closes, 12);
+            var ema26 = CalculateEMA(closes, 26);
+
+            decimal macd = ema12.Last() - ema26.Last();
+            var signal = CalculateEMA(new List<decimal> { macd }, 9).Last(); // MACD'nin 9 periyotluk EMA'sı
 
             return (macd, signal);
         }
 
-        // EMA hesaplaması
+        // SMA hesaplama
+        public List<decimal> CalculateSMA(List<decimal> closes, int period)
+        {
+            var sma = new List<decimal>();
+            for (int i = period - 1; i < closes.Count; i++)
+            {
+                var avg = closes.Skip(i - period + 1).Take(period).Average();
+                sma.Add(avg);
+            }
+            return sma;
+        }
+
+        // EMA hesaplama
         public List<decimal> CalculateEMA(List<decimal> closes, int period)
         {
-            List<decimal> ema = new List<decimal>();
+            var ema = new List<decimal>();
             decimal multiplier = 2m / (period + 1);
 
-            ema.Add(closes[0]); // İlk değeri ekle
-            for (int i = 1; i < closes.Count; i++)
+            ema.Add(closes.Take(period).Average()); // İlk değer basit ortalama
+            for (int i = period; i < closes.Count; i++)
             {
-                decimal currentEma = (closes[i] - ema[i - 1]) * multiplier + ema[i - 1];
-                ema.Add(currentEma);
+                decimal newEma = (closes[i] - ema.Last()) * multiplier + ema.Last();
+                ema.Add(newEma);
             }
-
             return ema;
         }
-        public async Task<string> GetTradeSuggestion(string symbol)
-        {
-            // Kline verilerini al (RSI ve MACD için)
-            var klines = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour, limit: 50);
-            var closes = klines.Data.Select(k => k.ClosePrice).ToList();
 
-            // RSI ve MACD hesaplama
-            var rsi = CalculateRSI(closes, 14);
-            var (macd, signal) = CalculateMACD(closes);
-
-            // Destek ve direnç seviyelerini al
-            var (supportLevel, resistanceLevel) = await GetSupportResistance(symbol);
-
-            // Mevcut piyasa fiyatını al
-            var priceResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetPriceAsync(symbol);
-            decimal entryPrice = priceResult.Data.Price;
-
-            // TP ve SL seviyelerini hesapla
-            decimal tpPrice = entryPrice * 1.02m; // %2 TP hedefi
-            decimal slPrice = entryPrice * 0.99m; // %1 SL hedefi
-
-            // Ticaret önerisini oluştur
-            string tradeSuggestion = $"Ticaret önerisi: {symbol}\n" +
-                $"Giriş Fiyatı: {entryPrice}\n" +
-                $"TP (Take Profit): {tpPrice}\n" +
-                $"SL (Stop Loss): {slPrice}\n";
-
-            // Long veya Short pozisyonu için mantık
-            if (rsi < 30 && macd > signal && entryPrice > supportLevel)
-            {
-                tradeSuggestion += "\nLong pozisyon açılabilir (Aşırı satım, MACD alım sinyali, Destek seviyesi üzerinde).";
-            }
-            else if (rsi > 70 && macd < signal && entryPrice < resistanceLevel)
-            {
-                tradeSuggestion += "\nShort pozisyon açılabilir (Aşırı alım, MACD satım sinyali, Direnç seviyesi altında).";
-            }
-            else if (rsi < 30 && macd > signal && entryPrice < supportLevel)
-            {
-                tradeSuggestion += "\nDikkat: Long pozisyon açmak riskli olabilir, destek seviyesi altında.";
-            }
-            else if (rsi > 70 && macd < signal && entryPrice > resistanceLevel)
-            {
-                tradeSuggestion += "\nDikkat: Short pozisyon açmak riskli olabilir, direnç seviyesi üzerinde.";
-            }
-            else
-            {
-                tradeSuggestion += "\nBeklemede kalın (Fiyat ve göstergeler uygun değil).";
-            }
-
-            return tradeSuggestion;
-        }
 
     }
 }

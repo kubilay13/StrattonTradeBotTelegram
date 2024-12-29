@@ -141,33 +141,36 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                     if (parts.Length == 4)
                     {
                         string symbol = parts[0].ToUpper();  // Sembol (ör. BTCUSDT)
-                        string action = parts[1].ToUpper();  // İşlem türü (LONG/SHORT)
+                        //string action = parts[1].ToUpper();  // İşlem türü (LONG/SHORT)
                         int leverage;
                         decimal amount;
+                        var tradeSuggestion = await _binanceCoinService.GetTradeSuggestion(symbol);
 
+                        // Ticaret önerisini kullanıcıya gönder
+                        await botClient.SendTextMessageAsync(message.Chat.Id, tradeSuggestion);
                         // Geçerli kaldıracı ve miktarı doğrula
-                        if (int.TryParse(parts[2], out leverage) && decimal.TryParse(parts[3], out amount))
-                        {
-                            if (symbol.EndsWith("USDT") && (action == "LONG" || action == "SHORT"))
-                            {
-                                // Binance API'si üzerinden işlem aç
-                                var result = await _binanceCoinService.OpenPosition(symbol, action, leverage, amount);
+                        //if (int.TryParse(parts[2], out leverage) && decimal.TryParse(parts[3], out amount))
+                        //{
+                        //    if (symbol.EndsWith("USDT") && (action == "LONG" || action == "SHORT"))
+                        //    {
+                        //        // Binance API'si üzerinden işlem aç
+                        //        var result = await _binanceCoinService.OpenPosition(symbol, action, leverage, amount);
 
-                                // Kullanıcıya işlem sonucu mesajı gönder
-                                await botClient.SendTextMessageAsync(message.Chat.Id, result);
-                                var balance = await _binanceCoinService.GetUserFuturesBalanceAsync();
-                                await botClient.SendTextMessageAsync(message.Chat.Id, $"Balance: {balance-amount} $");
+                        //        // Kullanıcıya işlem sonucu mesajı gönder
+                        //        await botClient.SendTextMessageAsync(message.Chat.Id, result);
+                        //        var balance = await _binanceCoinService.GetUserFuturesBalanceAsync();
+                        //        await botClient.SendTextMessageAsync(message.Chat.Id, $"Balance: {balance-amount} $");
 
-                            }
-                            else
-                            {
-                                await botClient.SendTextMessageAsync(message.Chat.Id, "Hatalı komut. Doğru format: /symbol LONG/SHORT LEVERAGE AMOUNT");
-                            }
-                        }
-                        else
-                        {
-                            await botClient.SendTextMessageAsync(message.Chat.Id, "Hatalı kaldırac veya miktar. Örnek: /BTCUSDT LONG 25 100");
-                        }
+                        //    }
+                        //    else
+                        //    {
+                        //        await botClient.SendTextMessageAsync(message.Chat.Id, "Hatalı komut. Doğru format: /symbol LONG/SHORT LEVERAGE AMOUNT");
+                        //    }
+                        //}
+                        //else
+                        //{
+                        //    await botClient.SendTextMessageAsync(message.Chat.Id, "Hatalı kaldırac veya miktar. Örnek: /BTCUSDT LONG 25 100");
+                        //}
                     }
                     else
                     {
