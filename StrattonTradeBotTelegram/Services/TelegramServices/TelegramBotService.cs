@@ -3,6 +3,7 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types;
 using StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService;
+using Binance.Net.Enums;
 
 namespace StrattonTradeBotTelegram.Services.TelegramServices
 {
@@ -81,6 +82,60 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                         await botClient.SendTextMessageAsync(message.Chat.Id, "Fiyat hatırlatıcı durduruldu.");
                     }
                 }
+                if (messageText.StartsWith("/"))
+                {
+                    // Komutun parçalarını ayır ("/BTCUSDT FİBONACCİ" -> ["BTCUSDT", "FİBONACCİ"])
+                    var parts = messageText.Substring(1).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                    // Coin sembolünü al
+                    if (parts.Length > 0)
+                    {
+                        string symbol = parts[0].ToUpper();
+
+                        // Eğer "FİBONACCİ" komutu varsa ve sembol "USDT" ile bitiyorsa analiz yap
+                        if (parts.Length > 1 && parts[1].Equals("FİBONACCİ", StringComparison.OrdinalIgnoreCase) && symbol.EndsWith("USDT"))
+                        {
+                            try
+                            {
+                                // Binance API'den Kline verilerini al (son 1 saatlik veri)
+                                var klineResult = await _binanceCoinService.GetKlinesAsync(
+                                    symbol,
+                                    KlineInterval.FiveMinutes,
+                                    limit: 500);
+
+                                // Kline verileri üzerinden analiz yapın
+                                var highestHigh = klineResult.Max(k => k.HighPrice);
+                                var lowestLow = klineResult.Min(k => k.LowPrice);
+
+                                // Fibonacci seviyelerini hesaplayın
+                                var fibLevels = _binanceCoinService.CalculateFibonacciLevels(highestHigh, lowestLow);
+
+                                // Fibonacci seviyelerini kullanıcıya gönderins
+                                string fibMessage = $"{symbol} Fibonacci Seviyeleri:\n" +
+                                                    $"0.000: {fibLevels[0]:F2} USDT\n" +
+                                                    $"0.236: {fibLevels[1]:F2} USDT\n" +
+                                                    $"0.382: {fibLevels[2]:F2} USDT\n" +
+                                                    $"0.500: {fibLevels[3]:F2} USDT\n" +
+                                                    $"0.618: {fibLevels[4]:F2} USDT\n" +
+                                                    $"0.786: {fibLevels[5]:F2} USDT\n" +
+                                                    $"1.000: {fibLevels[6]:F2} USDT";
+
+                                await botClient.SendTextMessageAsync(message.Chat.Id, fibMessage);
+                            }
+                            catch (Exception ex)
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat.Id, $"Bir hata oluştu: {ex.Message}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Coin sembolü belirtilmediğinde uyarı mesajı
+                        await botClient.SendTextMessageAsync(message.Chat.Id, "Eğer geçerli bir Coinin Fibonaccisini öğrenmek için: (örneğin, /BTCUSDT FİBONACCİ).");
+                    }
+                }
+
+                //İLKEL ANALİZ
 
                 if (messageText.StartsWith("/"))
                 {
@@ -120,6 +175,7 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                                 $"Giriş Fiyatı: {entryPrice} USDT\n" +
                                 $"Take Profit (TP): {tpPrice} USDT\n" +
                                 $"Stop Loss (SL): {slPrice} USDT");
+                            await botClient.SendTextMessageAsync(message.Chat.Id, "Yatırım Tavsiyesi Değildir.");
                         }
                         catch (Exception ex)
                         {
@@ -127,12 +183,9 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                             await botClient.SendTextMessageAsync(message.Chat.Id, "Fiyat alınırken bir hata oluştu. Lütfen tekrar deneyin.");
                         }
                     }
-                    else
-                    {
-                        // USDT ile bitmeyen coin sembolü için uyarı
-                        await botClient.SendTextMessageAsync(message.Chat.Id, "Lütfen geçerli bir USDT sembolü girin (örneğin, BTCUSDT).");
-                    }
                 }
+
+
                 //PİYASA FİYATINDAN İŞLEM AÇMA
                 if (messageText.StartsWith("/"))
                 {
@@ -172,10 +225,7 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                         //    await botClient.SendTextMessageAsync(message.Chat.Id, "Hatalı kaldırac veya miktar. Örnek: /BTCUSDT LONG 25 100");
                         //}
                     }
-                    else
-                    {
-                        await botClient.SendTextMessageAsync(message.Chat.Id, "Hatalı komut formatı. Örnek: /BTCUSDT LONG 25 100");
-                    }
+                   
                 }
 
             }
