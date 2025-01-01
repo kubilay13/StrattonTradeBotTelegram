@@ -112,7 +112,7 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
         public async Task<string> GetTradeSuggestion(string symbol)
         {
             // Kline verisi alınması
-            var klineResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour, limit: 150);
+            var klineResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour, limit: 24);
             if (!klineResult.Success)
                 return $"Kline verileri alınamadı: {klineResult.Error?.Message}";
 
@@ -255,6 +255,12 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
         }
         public List<decimal> CalculateFibonacciLevels(decimal highestHigh, decimal lowestLow)
         {
+            if (highestHigh <= lowestLow)
+            {
+                throw new ArgumentException("Highest High değeri Lowest Low değerinden büyük olmalıdır.");
+            }
+
+            // Farkı hesapla
             var difference = highestHigh - lowestLow;
 
             // Fibonacci seviyelerini hesapla
@@ -269,21 +275,31 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
         highestHigh                                 // 1.000
     };
 
+            // Log Fibonacci seviyeleri
+            Console.WriteLine("Fibonacci Seviyeleri:");
+            for (int i = 0; i < fibLevels.Count; i++)
+            {
+                Console.WriteLine($"Level {i}: {fibLevels[i]:F2}");
+            }
+
             return fibLevels;
         }
 
-        public async Task<string> GetFibonacciTradeWithTPAndSL(string symbol)
+
+        public async Task<string> GetImprovedFibonacciTradeWithTPAndSL(string symbol)
         {
             // Kline verisi alınması
             var klineResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour, limit: 150);
             if (!klineResult.Success)
                 return $"Kline verileri alınamadı: {klineResult.Error?.Message}";
 
+            var closes = klineResult.Data.Select(k => k.ClosePrice).ToList();
             var highPrices = klineResult.Data.Select(k => k.HighPrice).ToList();
             var lowPrices = klineResult.Data.Select(k => k.LowPrice).ToList();
 
-            decimal highestHigh = highPrices.Max();
-            decimal lowestLow = lowPrices.Min();
+            // Swing High/Low hesapla (örnek: 20 periyotluk)
+            decimal highestHigh = highPrices.TakeLast(20).Max();
+            decimal lowestLow = lowPrices.TakeLast(20).Min();
 
             // Fibonacci seviyelerini hesapla
             var fibLevels = CalculateFibonacciLevels(highestHigh, lowestLow);
@@ -295,43 +311,46 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
 
             decimal currentPrice = priceResult.Data.Price;
 
+            // ATR hesapla
+            decimal atr = CalculateATR(klineResult.Data.ToList(), 14);
+
             // Alım, TP ve SL seviyelerini belirle
             string tradeSuggestion = $"Mevcut Fiyat: {currentPrice}\n" +
                                      $"Fibonacci Seviyeleri:\n" +
-                                     $"0.236: {fibLevels[0]}\n" +
-                                     $"0.382: {fibLevels[1]}\n" +
-                                     $"0.5: {fibLevels[2]}\n" +
-                                     $"0.618: {fibLevels[3]}\n" +
-                                     $"0.786: {fibLevels[4]}\n";
+                                     $"0.236: {fibLevels[1]}\n" +
+                                     $"0.382: {fibLevels[2]}\n" +
+                                     $"0.5: {fibLevels[3]}\n" +
+                                     $"0.618: {fibLevels[4]}\n";
 
             // Ticaret önerisi
-            if (currentPrice < fibLevels[0])
+            if (currentPrice < fibLevels[1]) // Fiyat en alt seviyede
             {
-                decimal tp = fibLevels[1]; // TP, bir sonraki Fibonacci seviyesi
-                decimal sl = fibLevels[4]; // SL, en yüksek Fibonacci seviyesi
+                decimal tp = fibLevels[2];
+                decimal sl = currentPrice - atr;
 
-                tradeSuggestion += $"\n**ALIM ÖNERİSİ**\n" +
+                tradeSuggestion += $"\n**LONG ÖNERİSİ**\n" +
                                    $"Giriş Noktası: {currentPrice}\n" +
                                    $"Take Profit (TP): {tp}\n" +
                                    $"Stop Loss (SL): {sl}\n";
             }
-            else if (currentPrice > fibLevels[4])
+            else if (currentPrice > fibLevels[4]) // Fiyat en üst seviyede
             {
-                decimal tp = fibLevels[3]; // TP, bir önceki Fibonacci seviyesi
-                decimal sl = fibLevels[0]; // SL, en düşük Fibonacci seviyesi
+                decimal tp = fibLevels[3];
+                decimal sl = currentPrice + atr;
 
-                tradeSuggestion += $"\n**SATIŞ ÖNERİSİ**\n" +
+                tradeSuggestion += $"\n**SHORT ÖNERİSİ**\n" +
                                    $"Giriş Noktası: {currentPrice}\n" +
                                    $"Take Profit (TP): {tp}\n" +
                                    $"Stop Loss (SL): {sl}\n";
             }
             else
             {
-                tradeSuggestion += "\n**BEKLEME ÖNERİSİ**: Fiyat Fibonacci seviyeleri arasında hareket ediyor.";
+                tradeSuggestion += "\n**BEKLEME ÖNERİSİ**: Fiyat Fibonacci seviyeleri arasında.";
             }
 
             return tradeSuggestion;
         }
+
 
     }
 }

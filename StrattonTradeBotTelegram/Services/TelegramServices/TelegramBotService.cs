@@ -99,16 +99,24 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                             {
                                 // Binance API'den Kline verilerini al (son 1 saatlik veri)
                                 var klineResult = await _binanceCoinService.GetKlinesAsync(
-                                    symbol,
-                                    KlineInterval.FiveMinutes,
-                                    limit: 500);
+                                 "BTCUSDT",
+                                 KlineInterval.FiveMinutes,
+                                 limit: 100);
+
 
                                 // Kline verileri üzerinden analiz yapın
-                                var highestHigh = klineResult.Max(k => k.HighPrice);
-                                var lowestLow = klineResult.Min(k => k.LowPrice);
+                                decimal highestHigh = klineResult.Max(k => k.HighPrice);
+                                decimal lowestLow = klineResult.Min(k => k.LowPrice);
+
+                                Console.WriteLine($"Highest High: {highestHigh}, Lowest Low: {lowestLow}");
 
                                 // Fibonacci seviyelerini hesaplayın
                                 var fibLevels = _binanceCoinService.CalculateFibonacciLevels(highestHigh, lowestLow);
+
+                                
+
+                                Console.WriteLine($"Highest High: {highestHigh}, Lowest Low: {lowestLow}");
+
 
                                 // Fibonacci seviyelerini kullanıcıya gönderins
                                 string fibMessage = $"{symbol} Fibonacci Seviyeleri:\n" +
