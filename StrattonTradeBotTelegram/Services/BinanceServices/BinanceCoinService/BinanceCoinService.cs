@@ -5,7 +5,6 @@ using Binance.Net.Interfaces;
 using Binance.Net.Interfaces.Clients.UsdFuturesApi;
 using Binance.Net.Objects.Options;
 using CryptoExchange.Net.Authentication;
-using CryptoExchange.Net.CommonObjects;
 
 namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
 {
@@ -90,6 +89,7 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
                 throw;
             }
         }
+
         // Kline verisi dönüşümü için yardımcı metod
         public List<decimal> GetClosesFromKlines(IEnumerable<IBinanceKline> klines)
         {
@@ -157,7 +157,6 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
             return tradeSuggestion;
         }
 
-
         // Bollinger Bands hesaplama
         public (decimal, decimal) CalculateBollingerBands(List<decimal> closes)
         {
@@ -182,9 +181,6 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
             return trList.Take(period).Average();
         }
 
-
-
-        // RSI hesaplama
         // RSI hesaplama
         public decimal CalculateRSI(List<decimal> closes, int period)
         {
@@ -281,15 +277,15 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
 
             // Fibonacci seviyelerini hesapla
             var fibLevels = new List<decimal>
-    {
-        lowestLow,                                   // 0.000
-        lowestLow + difference * 0.236m,            // 0.236
-        lowestLow + difference * 0.382m,            // 0.382
-        lowestLow + difference * 0.500m,            // 0.500
-        lowestLow + difference * 0.618m,            // 0.618
-        lowestLow + difference * 0.786m,            // 0.786
-        highestHigh                                 // 1.000
-    };
+            {
+               lowestLow,                                   // 0.000
+               lowestLow + difference * 0.236m,            // 0.236
+               lowestLow + difference * 0.382m,            // 0.382
+               lowestLow + difference * 0.500m,            // 0.500
+               lowestLow + difference * 0.618m,            // 0.618
+               lowestLow + difference * 0.786m,            // 0.786
+               highestHigh                                 // 1.000
+            };
 
             // Log Fibonacci seviyeleri
             Console.WriteLine("Fibonacci Seviyeleri:");
@@ -300,7 +296,6 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
 
             return fibLevels;
         }
-
 
         public async Task<string> GetImprovedFibonacciTradeWithTPAndSL(string symbol)
         {
@@ -366,7 +361,5 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
 
             return tradeSuggestion;
         }
-
-
     }
 }
