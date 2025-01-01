@@ -111,61 +111,51 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
 
         public async Task<string> GetTradeSuggestion(string symbol)
         {
-            // Kline verisi alınması
-            var klineResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour, limit: 24);
+            // Kline verisi (5 dakikalık mumlar)
+            var klineResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.FiveMinutes, limit: 150);
             if (!klineResult.Success)
                 return $"Kline verileri alınamadı: {klineResult.Error?.Message}";
 
             var closes = klineResult.Data.Select(k => k.ClosePrice).ToList();
-            var highPrices = klineResult.Data.Select(k => k.HighPrice).ToList();
-            var lowPrices = klineResult.Data.Select(k => k.LowPrice).ToList();
 
-            // Teknik göstergeler hesaplaması
-            var (macd, signal) = CalculateMACD(closes);
-            var rsi = CalculateRSI(closes, 14);
-            var sma50 = CalculateSMA(closes, 50).Last();
-            var sma200 = CalculateSMA(closes, 200).Last();
+            // Teknik göstergeler
             var ema50 = CalculateEMA(closes, 50).Last();
             var ema200 = CalculateEMA(closes, 200).Last();
-            var bollingerBands = CalculateBollingerBands(closes);
-            var atr = CalculateATR(klineResult.Data.ToList(), 14);
 
-            // Mevcut fiyatı al
+            // Mevcut fiyat
             var priceResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetPriceAsync(symbol);
             if (!priceResult.Success)
                 return $"Fiyat bilgisi alınamadı: {priceResult.Error?.Message}";
 
             decimal currentPrice = priceResult.Data.Price;
 
-            // Risk-Reward hesaplaması
-            decimal tpPrice = currentPrice * 1.03m; // %3 Take Profit
-            decimal slPrice = currentPrice - atr * 1.5m; // ATR'ye dayalı Stop Loss
-            decimal riskRewardRatio = (tpPrice - currentPrice) / (currentPrice - slPrice); // Risk/Ödül Oranı hesaplama
-
-            // Ticaret önerisi başlatma
-            string tradeSuggestion = $"Giriş Fiyatı: {currentPrice}\n" +
-                                     $"Take Profit (TP): {tpPrice}\n" +
-                                     $"Stop Loss (SL): {slPrice}\n" +
-                                     $"Risk/Ödül Oranı: {riskRewardRatio:F2}\n";
-
-            // **LONG** Pozisyonu (Alış)
-            if (macd > signal && rsi < 30 && currentPrice < bollingerBands.Item1)
+            // Orta vadeli trend analizi
+            string trendSuggestion;
+            if (currentPrice > ema50 && currentPrice < ema200)
             {
-                tradeSuggestion += "**LONG** pozisyon açılabilir.";
+                trendSuggestion = "Orta vadeli trend yukarı yönlü. Fiyat, kısa vadede güçlü bir momentum gösteriyor ancak uzun vadeli direncin altında.";
             }
-            // **SHORT** Pozisyonu (Satış)
-            else if (macd < signal && rsi > 70 && currentPrice > bollingerBands.Item2)
+            else if (currentPrice < ema50 && currentPrice > ema200)
             {
-                tradeSuggestion += "**SHORT** pozisyon açılabilir.";
+                trendSuggestion = "Orta vadeli trend aşağı yönlü. Fiyat, kısa vadede zayıflık gösteriyor ancak uzun vadeli desteğin üzerinde.";
+            }
+            else if (currentPrice > ema200)
+            {
+                trendSuggestion = "Fiyat hem kısa hem de uzun vadeli ortalamaların üzerinde. Genel trend yukarı yönlü.";
             }
             else
             {
-                tradeSuggestion += "**BEKLE** pozisyonu.";
+                trendSuggestion = "Fiyat hem kısa hem de uzun vadeli ortalamaların altında. Genel trend aşağı yönlü.";
             }
+
+            // Ticaret önerisi
+            string tradeSuggestion = $"Mevcut Fiyat: {currentPrice}\n" +
+                                     $"EMA50: {ema50}\n" +
+                                     $"EMA200: {ema200}\n" +
+                                     $"{trendSuggestion}";
 
             return tradeSuggestion;
         }
-
 
 
         // Bollinger Bands hesaplama
@@ -195,25 +185,51 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
 
 
         // RSI hesaplama
+        // RSI hesaplama
         public decimal CalculateRSI(List<decimal> closes, int period)
         {
-            decimal gain = 0, loss = 0;
+            if (closes.Count < period)
+                throw new Exception("RSI hesaplaması için yeterli veri yok.");
+
+            decimal avgGain = 0;
+            decimal avgLoss = 0;
+
+            // İlk periyot için kazanç ve kayıp hesaplaması
             for (int i = 1; i <= period; i++)
             {
-                decimal change = closes[i] - closes[i - 1];
+                var change = closes[i] - closes[i - 1];
                 if (change > 0)
-                    gain += change;
+                    avgGain += change;
                 else
-                    loss -= change;
+                    avgLoss -= change;
             }
 
-            decimal avgGain = gain / period;
-            decimal avgLoss = loss / period;
+            avgGain /= period;
+            avgLoss /= period;
 
+            // Güncellenmiş RSI değerlerini hesapla
+            for (int i = period + 1; i < closes.Count; i++)
+            {
+                var change = closes[i] - closes[i - 1];
+                if (change > 0)
+                {
+                    avgGain = (avgGain * (period - 1) + change) / period;
+                    avgLoss = (avgLoss * (period - 1)) / period;
+                }
+                else
+                {
+                    avgGain = (avgGain * (period - 1)) / period;
+                    avgLoss = (avgLoss * (period - 1) - change) / period;
+                }
+            }
+
+            // RS ve RSI hesaplaması
+            if (avgLoss == 0)
+                return 100; // Hiç kayıp yoksa RSI 100
             decimal rs = avgGain / avgLoss;
-            decimal rsi = 100 - (100 / (1 + rs));
-            return rsi;
+            return 100 - (100 / (1 + rs));
         }
+
 
         // MACD hesaplama
         public (decimal macd, decimal signal) CalculateMACD(List<decimal> closes)

@@ -101,7 +101,7 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                                 var klineResult = await _binanceCoinService.GetKlinesAsync(
                                  "BTCUSDT",
                                  KlineInterval.FiveMinutes,
-                                 limit: 100);
+                                 limit: 200);
 
 
                                 // Kline verileri üzerinden analiz yapın
@@ -178,12 +178,27 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                             decimal slPrice = entryPrice * 0.99m;  // %1 SL
 
                             // Kullanıcıya giriş fiyatı, TP ve SL seviyelerini gönder
-                            await botClient.SendTextMessageAsync(message.Chat.Id,
-                                $"{symbol} için işlem bilgileri:\n" +
-                                $"Giriş Fiyatı: {entryPrice} USDT\n" +
-                                $"Take Profit (TP): {tpPrice} USDT\n" +
-                                $"Stop Loss (SL): {slPrice} USDT");
-                            await botClient.SendTextMessageAsync(message.Chat.Id, "Yatırım Tavsiyesi Değildir.");
+
+                            if(tpPrice>entryPrice)
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat.Id, "LONG");
+                                await botClient.SendTextMessageAsync(message.Chat.Id,
+                              $"{symbol} için işlem bilgileri:\n" +
+                              $"Giriş Fiyatı: {entryPrice} USDT\n" +
+                              $"Take Profit (TP): {tpPrice} USDT\n" +
+                              $"Stop Loss (SL): {slPrice} USDT");
+                                await botClient.SendTextMessageAsync(message.Chat.Id, "Yatırım Tavsiyesi Değildir.");
+                            }else
+                            {
+                                await botClient.SendTextMessageAsync(message.Chat.Id, "SHORT");
+                                await botClient.SendTextMessageAsync(message.Chat.Id,
+                              $"{symbol} için işlem bilgileri:\n" +
+                              $"Giriş Fiyatı: {entryPrice} USDT\n" +
+                              $"Take Profit (TP): {tpPrice} USDT\n" +
+                              $"Stop Loss (SL): {slPrice} USDT");
+                                await botClient.SendTextMessageAsync(message.Chat.Id, "Yatırım Tavsiyesi Değildir.");
+                            }
+                          
                         }
                         catch (Exception ex)
                         {
@@ -192,7 +207,6 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                         }
                     }
                 }
-
 
                 //PİYASA FİYATINDAN İŞLEM AÇMA
                 if (messageText.StartsWith("/"))
