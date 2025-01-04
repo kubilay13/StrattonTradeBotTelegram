@@ -13,8 +13,9 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
         private readonly BinanceCoinService _binanceCoinService;
         private readonly PriceReminderService _priceReminderService;
         private readonly SymbolFibonacciService _symbolFibonacciService;
+        private readonly PriceEstimateService _priceEstimateService;    
         private bool _isPriceReminderStarted = false;
-        public TelegramBotService(string token, string binanceApiKey, string binanceApiSecret, bool isTestnet,BinanceCoinService binanceCoinService, PriceReminderService priceReminderService, SymbolFibonacciService symbolFibonacciService)
+        public TelegramBotService(string token, string binanceApiKey, string binanceApiSecret, bool isTestnet,BinanceCoinService binanceCoinService, PriceReminderService priceReminderService, SymbolFibonacciService symbolFibonacciService, PriceEstimateService priceEstimateService)
         {
             var botOptions = new TelegramBotClientOptions(token);
             _botService = new TelegramBotClient(botOptions);
@@ -22,6 +23,7 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
             _binanceCoinService = binanceCoinService;
             _priceReminderService = priceReminderService;
             _symbolFibonacciService = symbolFibonacciService;
+            _priceEstimateService = priceEstimateService;
         }
         public void StartReceiving()
         {
@@ -75,6 +77,7 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                     }
                 }
 
+                //FİYAT TAKİBİNİ KAPATMA
                 else if (messageText.StartsWith("/FiyatTakipKapat"))
                 {
                     // Fiyat hatırlatıcıyı durdur
@@ -227,7 +230,7 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                         //string action = parts[1].ToUpper();  // İşlem türü (LONG/SHORT)
                         int leverage;
                         decimal amount;
-                        var tradeSuggestion = await _binanceCoinService.GetTradeSuggestion(symbol);
+                        var tradeSuggestion = await _priceEstimateService.GetTradeSuggestion(symbol);
 
                         // Ticaret önerisini kullanıcıya gönder
                         await botClient.SendTextMessageAsync(message.Chat.Id, tradeSuggestion);

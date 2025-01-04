@@ -22,10 +22,12 @@ builder.Services.AddSingleton<BinanceCoinService>(serviceProvider =>
 // Telegram Bot istemcisini baðýmlýlýk enjeksiyonuna ekleyin
 builder.Services.AddSingleton<ITelegramBotClient>(new TelegramBotClient(telegramBotToken));
 builder.Services.AddSingleton<SymbolFibonacciService>();
+builder.Services.AddSingleton<PriceEstimateService>();
 builder.Services.AddSingleton<BinanceRestClient>();
 // PriceReminderService'i baðýmlýlýklarýný çözerek ekliyoruz
 builder.Services.AddSingleton<PriceReminderService>(serviceProvider =>
 {
+    var priceEstimateService = serviceProvider.GetRequiredService<PriceEstimateService>();
     var telegramBotClient = serviceProvider.GetRequiredService<ITelegramBotClient>();
     var binanceCoinService = serviceProvider.GetRequiredService<BinanceCoinService>();
     var symbolFibonacciService = serviceProvider.GetRequiredService<SymbolFibonacciService>();
@@ -36,10 +38,11 @@ builder.Services.AddSingleton<PriceReminderService>(serviceProvider =>
 // TelegramBotService'i ekliyoruz
 builder.Services.AddSingleton<TelegramBotService>(serviceProvider =>
 {
+    var priceEstimateService = serviceProvider.GetRequiredService<PriceEstimateService>();
     var symbolFibonacciService= serviceProvider.GetRequiredService<SymbolFibonacciService>();
     var priceReminderService = serviceProvider.GetRequiredService<PriceReminderService>();
     var binanceCoinService = serviceProvider.GetRequiredService<BinanceCoinService>();
-    return new TelegramBotService(telegramBotToken, binanceApiKey, binanceApiSecret, isTestnet, binanceCoinService, priceReminderService,symbolFibonacciService);
+    return new TelegramBotService(telegramBotToken, binanceApiKey, binanceApiSecret, isTestnet, binanceCoinService, priceReminderService,symbolFibonacciService,priceEstimateService);
 });
 
 // Diðer servisleri ekle
