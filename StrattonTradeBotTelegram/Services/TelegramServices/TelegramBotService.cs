@@ -47,6 +47,10 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                 if (messageText.StartsWith("/Komutlar"))
                 {
                     await botClient.SendTextMessageAsync(message.Chat.Id, "/SYMBOL");
+                    await botClient.SendTextMessageAsync(message.Chat.Id, "/BALANCE");
+                    await botClient.SendTextMessageAsync(message.Chat.Id, "/FiyatTakipAç");
+                    await botClient.SendTextMessageAsync(message.Chat.Id, "/FiyatTakipKapat");
+                    await botClient.SendTextMessageAsync(message.Chat.Id, "/SYMBOL FİBONACCİ");
                 }
                 if (messageText.StartsWith("/Balance"))
                 {
@@ -71,7 +75,7 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                     }
                 }
 
-                else if (messageText.StartsWith("/Kapat"))
+                else if (messageText.StartsWith("/FiyatTakipKapat"))
                 {
                     // Fiyat hatırlatıcıyı durdur
                     if (_isPriceReminderStarted)
