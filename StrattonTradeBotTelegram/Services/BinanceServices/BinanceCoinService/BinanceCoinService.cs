@@ -95,19 +95,7 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
         {
             return klines.Select(kline => kline.ClosePrice).ToList();
         }
-        public async Task<IEnumerable<IBinanceKline>> GetKlinesAsync(string symbol, KlineInterval interval, int limit)
-        {
-            // Şu andan itibaren geriye dönük bir zaman aralığı hesaplayın
-            var endTime = DateTime.UtcNow;
-            var startTime = endTime.AddHours(-limit); // Limit kadar geriye gidin
-
-            // Binance API'den Kline verilerini alın
-            var result = await _usdFuturesApiClient.ExchangeData.GetKlinesAsync(symbol, interval, startTime, endTime, limit: limit);
-            if (!result.Success)
-                throw new Exception($"Kline verileri alınamadı: {result.Error?.Message}");
-
-            return result.Data;
-        }
+       
 
         public async Task<string> GetTradeSuggestion(string symbol)
         {
@@ -265,101 +253,71 @@ namespace StrattonTradeBotTelegram.Services.BinanceServices.BinanceCoinService
             }
             return ema;
         }
-        public List<decimal> CalculateFibonacciLevels(decimal highestHigh, decimal lowestLow)
-        {
-            if (highestHigh <= lowestLow)
-            {
-                throw new ArgumentException("Highest High değeri Lowest Low değerinden büyük olmalıdır.");
-            }
+        
 
-            // Farkı hesapla
-            var difference = highestHigh - lowestLow;
+        //public async Task<string> GetImprovedFibonacciTradeWithTPAndSL(string symbol)
+        //{
+        //    // Kline verisi alınması
+        //    var klineResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour, limit: 150);
+        //    if (!klineResult.Success)
+        //        return $"Kline verileri alınamadı: {klineResult.Error?.Message}";
 
-            // Fibonacci seviyelerini hesapla
-            var fibLevels = new List<decimal>
-            {
-               lowestLow,                                   // 0.000
-               lowestLow + difference * 0.236m,            // 0.236
-               lowestLow + difference * 0.382m,            // 0.382
-               lowestLow + difference * 0.500m,            // 0.500
-               lowestLow + difference * 0.618m,            // 0.618
-               lowestLow + difference * 0.786m,            // 0.786
-               highestHigh                                 // 1.000
-            };
+        //    var closes = klineResult.Data.Select(k => k.ClosePrice).ToList();
+        //    var highPrices = klineResult.Data.Select(k => k.HighPrice).ToList();
+        //    var lowPrices = klineResult.Data.Select(k => k.LowPrice).ToList();
 
-            // Log Fibonacci seviyeleri
-            Console.WriteLine("Fibonacci Seviyeleri:");
-            for (int i = 0; i < fibLevels.Count; i++)
-            {
-                Console.WriteLine($"Level {i}: {fibLevels[i]:F2}");
-            }
+        //    // Swing High/Low hesapla (örnek: 20 periyotluk)
+        //    decimal highestHigh = highPrices.TakeLast(20).Max();
+        //    decimal lowestLow = lowPrices.TakeLast(20).Min();
 
-            return fibLevels;
-        }
+        //    // Fibonacci seviyelerini hesapla
+        //    var fibLevels = CalculateFibonacciLevels(highestHigh, lowestLow);
 
-        public async Task<string> GetImprovedFibonacciTradeWithTPAndSL(string symbol)
-        {
-            // Kline verisi alınması
-            var klineResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetKlinesAsync(symbol, KlineInterval.OneHour, limit: 150);
-            if (!klineResult.Success)
-                return $"Kline verileri alınamadı: {klineResult.Error?.Message}";
+        //    // Mevcut fiyatı al
+        //    var priceResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetPriceAsync(symbol);
+        //    if (!priceResult.Success)
+        //        return $"Fiyat bilgisi alınamadı: {priceResult.Error?.Message}";
 
-            var closes = klineResult.Data.Select(k => k.ClosePrice).ToList();
-            var highPrices = klineResult.Data.Select(k => k.HighPrice).ToList();
-            var lowPrices = klineResult.Data.Select(k => k.LowPrice).ToList();
+        //    decimal currentPrice = priceResult.Data.Price;
 
-            // Swing High/Low hesapla (örnek: 20 periyotluk)
-            decimal highestHigh = highPrices.TakeLast(20).Max();
-            decimal lowestLow = lowPrices.TakeLast(20).Min();
+        //    // ATR hesapla
+        //    decimal atr = CalculateATR(klineResult.Data.ToList(), 14);
 
-            // Fibonacci seviyelerini hesapla
-            var fibLevels = CalculateFibonacciLevels(highestHigh, lowestLow);
+        //    // Alım, TP ve SL seviyelerini belirle
+        //    string tradeSuggestion = $"Mevcut Fiyat: {currentPrice}\n" +
+        //                             $"Fibonacci Seviyeleri:\n" +
+        //                             $"0.236: {fibLevels[1]}\n" +
+        //                             $"0.382: {fibLevels[2]}\n" +
+        //                             $"0.5: {fibLevels[3]}\n" +
+        //                             $"0.618: {fibLevels[4]}\n";
 
-            // Mevcut fiyatı al
-            var priceResult = await _binanceRestClient.UsdFuturesApi.ExchangeData.GetPriceAsync(symbol);
-            if (!priceResult.Success)
-                return $"Fiyat bilgisi alınamadı: {priceResult.Error?.Message}";
+        //    // Ticaret önerisi
+        //    if (currentPrice < fibLevels[1]) // Fiyat en alt seviyede
+        //    {
+        //        decimal tp = fibLevels[2];
+        //        decimal sl = currentPrice - atr;
 
-            decimal currentPrice = priceResult.Data.Price;
+        //        tradeSuggestion += $"\n**LONG ÖNERİSİ**\n" +
+        //                           $"Giriş Noktası: {currentPrice}\n" +
+        //                           $"Take Profit (TP): {tp}\n" +
+        //                           $"Stop Loss (SL): {sl}\n";
+        //    }
+        //    else if (currentPrice > fibLevels[4]) // Fiyat en üst seviyede
+        //    {
+        //        decimal tp = fibLevels[3];
+        //        decimal sl = currentPrice + atr;
 
-            // ATR hesapla
-            decimal atr = CalculateATR(klineResult.Data.ToList(), 14);
+        //        tradeSuggestion += $"\n**SHORT ÖNERİSİ**\n" +
+        //                           $"Giriş Noktası: {currentPrice}\n" +
+        //                           $"Take Profit (TP): {tp}\n" +
+        //                           $"Stop Loss (SL): {sl}\n";
+        //    }
+        //    else
+        //    {
+        //        tradeSuggestion += "\n**BEKLEME ÖNERİSİ**: Fiyat Fibonacci seviyeleri arasında.";
+        //    }
 
-            // Alım, TP ve SL seviyelerini belirle
-            string tradeSuggestion = $"Mevcut Fiyat: {currentPrice}\n" +
-                                     $"Fibonacci Seviyeleri:\n" +
-                                     $"0.236: {fibLevels[1]}\n" +
-                                     $"0.382: {fibLevels[2]}\n" +
-                                     $"0.5: {fibLevels[3]}\n" +
-                                     $"0.618: {fibLevels[4]}\n";
-
-            // Ticaret önerisi
-            if (currentPrice < fibLevels[1]) // Fiyat en alt seviyede
-            {
-                decimal tp = fibLevels[2];
-                decimal sl = currentPrice - atr;
-
-                tradeSuggestion += $"\n**LONG ÖNERİSİ**\n" +
-                                   $"Giriş Noktası: {currentPrice}\n" +
-                                   $"Take Profit (TP): {tp}\n" +
-                                   $"Stop Loss (SL): {sl}\n";
-            }
-            else if (currentPrice > fibLevels[4]) // Fiyat en üst seviyede
-            {
-                decimal tp = fibLevels[3];
-                decimal sl = currentPrice + atr;
-
-                tradeSuggestion += $"\n**SHORT ÖNERİSİ**\n" +
-                                   $"Giriş Noktası: {currentPrice}\n" +
-                                   $"Take Profit (TP): {tp}\n" +
-                                   $"Stop Loss (SL): {sl}\n";
-            }
-            else
-            {
-                tradeSuggestion += "\n**BEKLEME ÖNERİSİ**: Fiyat Fibonacci seviyeleri arasında.";
-            }
-
-            return tradeSuggestion;
-        }
+        //    return tradeSuggestion;
+        //}
     }
 }

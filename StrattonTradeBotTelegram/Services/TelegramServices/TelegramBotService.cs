@@ -12,14 +12,16 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
         private readonly ITelegramBotClient _botService;
         private readonly BinanceCoinService _binanceCoinService;
         private readonly PriceReminderService _priceReminderService;
+        private readonly SymbolFibonacciService _symbolFibonacciService;
         private bool _isPriceReminderStarted = false;
-        public TelegramBotService(string token, string binanceApiKey, string binanceApiSecret, bool isTestnet,BinanceCoinService binanceCoinService, PriceReminderService priceReminderService)
+        public TelegramBotService(string token, string binanceApiKey, string binanceApiSecret, bool isTestnet,BinanceCoinService binanceCoinService, PriceReminderService priceReminderService, SymbolFibonacciService symbolFibonacciService)
         {
             var botOptions = new TelegramBotClientOptions(token);
             _botService = new TelegramBotClient(botOptions);
             _binanceCoinService = new BinanceCoinService(binanceApiKey, binanceApiSecret, isTestnet);
             _binanceCoinService = binanceCoinService;
             _priceReminderService = priceReminderService;
+            _symbolFibonacciService = symbolFibonacciService;
         }
         public void StartReceiving()
         {
@@ -82,6 +84,8 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                         await botClient.SendTextMessageAsync(message.Chat.Id, "Fiyat hatırlatıcı durduruldu.");
                     }
                 }
+
+                //FİBONACCİ HESAPLAMA 
                 if (messageText.StartsWith("/"))
                 {
                     // Komutun parçalarını ayır ("/BTCUSDT FİBONACCİ" -> ["BTCUSDT", "FİBONACCİ"])
@@ -98,8 +102,8 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                             try
                             {
                                 // Binance API'den Kline verilerini al (son 1 saatlik veri)
-                                var klineResult = await _binanceCoinService.GetKlinesAsync(
-                                 "BTCUSDT",
+                                var klineResult = await _symbolFibonacciService.GetKlinesAsync(
+                                 symbol,
                                  KlineInterval.FiveMinutes,
                                  limit: 200);
 
@@ -111,7 +115,7 @@ namespace StrattonTradeBotTelegram.Services.TelegramServices
                                 Console.WriteLine($"Highest High: {highestHigh}, Lowest Low: {lowestLow}");
 
                                 // Fibonacci seviyelerini hesaplayın
-                                var fibLevels = _binanceCoinService.CalculateFibonacciLevels(highestHigh, lowestLow);
+                                var fibLevels = _symbolFibonacciService.CalculateFibonacciLevels(highestHigh, lowestLow);
 
                                 
 
